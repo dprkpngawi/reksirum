@@ -144,10 +144,11 @@
      on reksirum_petugas for update
      using (true) with check (true);
 
-   Saat pertama kali dibuka dan tabel reksirum_petugas masih kosong, halaman ini
-   otomatis mengisi 6 petugas awal (Hari Siswanto dkk) supaya tidak perlu input
-   ulang manual. Sesudah itu semua tambah/hapus petugas dilakukan lewat tab
-   Rekap Admin dan langsung tersimpan di database.
+   Kalau tabel reksirum_petugas masih benar-benar kosong (belum pernah diisi
+   sama sekali), tambahkan petugas pertama lewat tab Rekap Admin -> "Kelola
+   Petugas". Semua tambah/edit/hapus petugas tersimpan permanen di database
+   dan TIDAK ada isi ulang otomatis -- jadi kalau admin menghapus petugas,
+   datanya benar-benar hilang dan tidak akan muncul lagi sendiri.
 
 6. SINKRON REALTIME (Data Petugas & Data Perumahan). Supaya tambah/edit/hapus
    petugas dan perumahan langsung sinkron di semua perangkat/tab yang sedang
@@ -1056,7 +1057,7 @@ async function loadPetugas(){
     renderPetugasAdminList();
     return;
   }
-  let { data, error } = await sb.from('reksirum_petugas').select('*').order('nama', { ascending: true });
+  const { data, error } = await sb.from('reksirum_petugas').select('*').order('nama', { ascending: true });
   if(error){
     console.error(error);
     PETUGAS_LIST = DEFAULT_PETUGAS.map((p, i) => ({ ...p, id: 'local-' + i }));
@@ -1064,18 +1065,13 @@ async function loadPetugas(){
     renderPetugasAdminList();
     return;
   }
-  if(!data || data.length === 0){
-    // Tabel masih kosong -> isi otomatis dengan daftar awal, lalu ambil ulang dari DB
-    const { error: seedErr } = await sb.from('reksirum_petugas').insert(DEFAULT_PETUGAS);
-    if(!seedErr){
-      const reload = await sb.from('reksirum_petugas').select('*').order('nama', { ascending: true });
-      data = reload.data || [];
-    } else {
-      console.error(seedErr);
-      data = DEFAULT_PETUGAS.map((p, i) => ({ ...p, id: 'local-' + i }));
-    }
-  }
-  PETUGAS_LIST = data;
+  // CATATAN: dulu di sini ada logika "kalau tabel kosong, isi otomatis dengan
+  // daftar awal (DEFAULT_PETUGAS)". Itu dihapus karena menyebabkan bug: begitu
+  // admin menghapus SEMUA petugas, tabel jadi kosong -> kode ini langsung
+  // mengisi ulang nama-nama default itu sendiri, sehingga terlihat seperti
+  // "dihapus tapi balik lagi". Sekarang kalau tabel kosong, daftarnya memang
+  // ditampilkan kosong (sesuai yang dihapus admin) dan TIDAK diisi otomatis lagi.
+  PETUGAS_LIST = data || [];
   populateTimSelect();
   renderPetugasAdminList();
 }
