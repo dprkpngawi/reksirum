@@ -148,6 +148,18 @@
    otomatis mengisi 6 petugas awal (Hari Siswanto dkk) supaya tidak perlu input
    ulang manual. Sesudah itu semua tambah/hapus petugas dilakukan lewat tab
    Rekap Admin dan langsung tersimpan di database.
+
+6. SINKRON REALTIME (Data Petugas & Data Perumahan). Supaya tambah/edit/hapus
+   petugas dan perumahan langsung sinkron di semua perangkat/tab yang sedang
+   membuka halaman ini (tanpa perlu refresh manual), aktifkan Realtime untuk
+   kedua tabel tsb. Jalankan sekali di SQL Editor (aman diulang):
+
+   alter publication supabase_realtime add table reksirum_petugas;
+   alter publication supabase_realtime add table reksirum_perumahan;
+
+   (Kalau project Supabase kamu baru dan Realtime sudah otomatis aktif untuk
+   semua tabel, perintah di atas akan error "already member of publication" --
+   itu artinya sudah aktif, tinggal diabaikan.)
 =====================================================================
 -->
 
@@ -960,6 +972,37 @@ try{
   const banner = document.getElementById('globalError');
   banner.textContent = 'Koneksi ke database belum siap: ' + err.message + ' Coba refresh halaman, atau hubungi admin.';
   banner.style.display = 'block';
+}
+
+/* ---------- Sinkron realtime lintas perangkat ----------
+   Begitu ada tambah/edit/hapus di tabel reksirum_petugas atau
+   reksirum_perumahan (dari admin manapun, di device manapun), semua
+   browser yang sedang membuka halaman ini otomatis memuat ulang data
+   terbaru dari database -> dropdown & daftar admin langsung ikut
+   berubah (tampil/hilang) tanpa perlu refresh manual.
+
+   CATATAN: fitur ini butuh Realtime aktif untuk kedua tabel tsb.
+   Kalau belum aktif, jalankan sekali di SQL Editor Supabase:
+     alter publication supabase_realtime add table reksirum_petugas;
+     alter publication supabase_realtime add table reksirum_perumahan;
+   (Supabase project baru biasanya sudah otomatis publish semua tabel;
+   kalau sudah aktif, perintah di atas cukup diabaikan/aman diulang.)
+------------------------------------------------------------------ */
+function debounce(fn, wait){
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); };
+}
+if(sb){
+  const syncPetugas = debounce(() => loadPetugas(), 250);
+  const syncPerumahan = debounce(() => { loadPerumahanList(); loadConfig(); }, 250);
+
+  sb.channel('reksirum-petugas-sync')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'reksirum_petugas' }, syncPetugas)
+    .subscribe();
+
+  sb.channel('reksirum-perumahan-sync')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'reksirum_perumahan' }, syncPerumahan)
+    .subscribe();
 }
 
 /* ---------- Tabs ---------- */
